@@ -1,17 +1,24 @@
 import Phaser from 'phaser';
-import { GameScene } from './GameScene';
+import { ArenaScene } from './ArenaScene';
+
+export const GAME_WIDTH = 960;
+export const GAME_HEIGHT = 640;
 
 export function createGame(parent: string): Phaser.Game {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent,
-    width: 960,
-    height: 640,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
     backgroundColor: '#0f172a',
-    scene: [GameScene],
+    scene: [ArenaScene],
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
+    physics: {
+      default: 'arcade',
+      arcade: { gravity: { x: 0, y: 0 }, debug: false },
     },
   };
 
