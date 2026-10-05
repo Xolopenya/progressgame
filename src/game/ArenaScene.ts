@@ -4,6 +4,7 @@ import { Enemy } from './entities/Enemy';
 import { Coin } from './entities/Coin';
 import { SpawnSystem } from './systems/SpawnSystem';
 import { ShopSystem } from './systems/ShopSystem';
+import { ProjectileSystem } from './systems/ProjectileSystem';
 import { ProgressionSystem } from './systems/ProgressionSystem';
 import { Hud } from './ui/Hud';
 import { DeathScreen } from './ui/DeathScreen';
@@ -16,12 +17,14 @@ export class ArenaScene extends Phaser.Scene {
   player!: Player;
   enemies!: Phaser.Physics.Arcade.Group;
   coins!: Phaser.Physics.Arcade.Group;
+  projectiles!: ProjectileSystem;
 
   private spawnSystem!: SpawnSystem;
   private shopSystem!: ShopSystem;
   private progression!: ProgressionSystem;
   private hud!: Hud;
   private deathScreen!: DeathScreen;
+  private enemyBars!: Phaser.GameObjects.Graphics;
 
   private wasd!: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -50,6 +53,8 @@ export class ArenaScene extends Phaser.Scene {
     this.player = new Player(this);
     this.enemies = this.physics.add.group({ runChildUpdate: false });
     this.coins = this.physics.add.group({ runChildUpdate: false });
+    this.projectiles = new ProjectileSystem(this);
+    this.enemyBars = this.add.graphics().setDepth(7);
 
     this.spawnSystem = new SpawnSystem(this, this.enemies);
     this.progression = new ProgressionSystem(this.player);
@@ -106,6 +111,8 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnSystem.update(dt, this.elapsedSec);
     this.updateEnemies(dt);
     this.player.updateAutoAttack(this.enemies, dt);
+    this.projectiles.update();
+    this.drawEnemyHealthBars();
     this.updateCoinsMagnet();
     this.checkEnemyContacts();
 
@@ -137,12 +144,29 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  /** ИИ врагов: прямое преследование игрока. */
+  /** ИИ врагов: продвинутый (упреждение, стрейф, рывки, separation). */
   private updateEnemies(dt: number): void {
     const list = this.enemies.getChildren().slice() as unknown as Enemy[];
     for (const enemy of list) {
       if (!enemy.active) continue;
-      enemy.chase(this.player.x, this.player.y, dt);
+      enemy.chase(this.player.x, this.player.y, dt, list);
+    }
+  }
+
+  /** HP-бары над ранеными врагами — читаемость урона по толстым типам. */
+  private drawEnemyHealthBars(): void {
+    const g = this.enemyBars;
+    g.clear();
+    const list = this.enemies.getChildren().slice() as unknown as Enemy[];
+    for (const enemy of list) {
+      if (!enemy.active || enemy.hp >= enemy.maxHp) continue;
+      const w = enemy.radius * 2;
+      const ratio = Math.max(0, enemy.hp / enemy.maxHp);
+      const y = enemy.y - enemy.radius - 8;
+      g.fillStyle(0x0f172a, 0.9);
+      g.fillRect(enemy.x - w / 2, y, w, 4);
+      g.fillStyle(ratio > 0.35 ? 0x22c55e : 0xef4444, 1);
+      g.fillRect(enemy.x - w / 2, y, w * ratio, 4);
     }
   }
 
@@ -185,6 +209,7 @@ export class ArenaScene extends Phaser.Scene {
   private toggleShop(): void {
     this.pausedByShop = !this.pausedByShop;
     if (this.pausedByShop) {
+      this.hud.markShopUsed();
       this.physics.pause();
       this.shopSystem.open(() => this.closeShop());
     } else {

@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type { ArenaScene } from '../ArenaScene';
-import { Enemy } from './Enemy';
-import { Projectile } from './Projectile';
+import type { Enemy } from './Enemy';
 
 const BASE_MAX_HP = 100;
 const BASE_DAMAGE = 12;
@@ -12,7 +11,8 @@ const BASE_MAGNET_RADIUS = 90;
 
 /**
  * Игрок: hp, maxHp, level, xp, coins, damage, attackSpeed, moveSpeed, regen.
- * Движение — WASD/стрелки ( kinematic, без физики-тела ), автоатака — ближайший враг в радиусе.
+ * Движение — WASD/стрелки (kinematic), автоатака — ближайший враг в радиусе,
+ * снаряды летят через ProjectileSystem с упреждением цели.
  */
 export class Player extends Phaser.GameObjects.Rectangle {
   hp = BASE_MAX_HP;
@@ -65,7 +65,7 @@ export class Player extends Phaser.GameObjects.Rectangle {
     }
   }
 
-  /** Автоатака ближайшего врага в радиусе. */
+  /** Автоатака ближайшего врага в радиусе: выстрел с упреждением через пул снарядов. */
   updateAutoAttack(enemies: Phaser.Physics.Arcade.Group, dt: number): void {
     this.attackCooldown -= dt;
     if (this.attackCooldown > 0) return;
@@ -84,7 +84,9 @@ export class Player extends Phaser.GameObjects.Rectangle {
 
     if (nearest) {
       this.attackCooldown = 1 / this.attackSpeed;
-      Projectile.fireAt(this.arena, this.x, this.y, nearest, this.projectileDamage);
+      this.arena.projectiles.fireWithLead(this.x, this.y, nearest, this.projectileDamage);
+      // Вспышка дула — короткий твин на самом игроке для «живости».
+      this.arena.tweens.add({ targets: this, scaleX: 1.15, scaleY: 1.15, duration: 60, yoyo: true });
     } else {
       this.attackCooldown = 0.05; // подождать, пока появится цель
     }
