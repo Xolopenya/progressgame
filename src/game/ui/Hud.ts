@@ -21,6 +21,12 @@ export class Hud {
   private buffText: Phaser.GameObjects.Text;
   private flash: Phaser.GameObjects.Text;
 
+  // UX: подсказка кнопки магазина (пульсирует, пока магазин ни разу не открывали).
+  private shopHintPill: Phaser.GameObjects.Graphics;
+  private shopHintText: Phaser.GameObjects.Text;
+  private shopHintTween: Phaser.Tweens.Tween | null = null;
+  private shopEverOpened = false;
+
   constructor(scene: ArenaScene) {
     this.scene = scene;
     const w = scene.scale.width;
@@ -42,6 +48,41 @@ export class Hud {
     this.flash = scene.add.text(w / 2, 110, 'LEVEL UP!', {
       fontFamily: FONT, fontSize: '30px', color: '#4ade80', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(42).setAlpha(0);
+
+    // Подсказка «[B] Магазин» внизу по центру: pill + текст, пульсация масштабом.
+    this.shopHintPill = scene.add.graphics().setDepth(41);
+    this.shopHintPill.fillStyle(0x1e293b, 0.85);
+    this.shopHintPill.fillRoundedRect(w / 2 - 92, scene.scale.height - 44, 184, 30, 15);
+    this.shopHintText = scene.add.text(w / 2, scene.scale.height - 29, '[ B ] Магазин', {
+      fontFamily: FONT, fontSize: '16px', color: '#7dd3fc',
+    }).setOrigin(0.5).setDepth(42);
+    this.shopHintTween = scene.tweens.add({
+      targets: [this.shopHintPill, this.shopHintText],
+      alpha: 0.35,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
+  }
+
+  /** Магазин открыли впервые — подсказка больше не нужна. */
+  markShopUsed(): void {
+    if (this.shopEverOpened) return;
+    this.shopEverOpened = true;
+    if (this.shopHintTween) {
+      this.shopHintTween.remove();
+      this.shopHintTween = null;
+    }
+    this.scene.tweens.add({
+      targets: [this.shopHintPill, this.shopHintText],
+      alpha: 0,
+      duration: 350,
+      onComplete: () => {
+        this.shopHintPill.destroy();
+        this.shopHintText.destroy();
+      },
+    });
   }
 
   refresh(player: Player, elapsedSec: number, kills: number): void {
